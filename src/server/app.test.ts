@@ -120,7 +120,9 @@ describe('term-deposit-manager API', () => {
 
     const csvRes = await app.request('/api/export-csv');
     expect(csvRes.status).toBe(200);
-    const csvTextExport = await csvRes.text();
+    const csvBytes = new Uint8Array(await csvRes.arrayBuffer());
+    expect(Array.from(csvBytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    const csvTextExport = new TextDecoder('utf-8', { ignoreBOM: true }).decode(csvBytes);
     expect(csvTextExport.startsWith('\uFEFF銀行名,ステータス,')).toBe(true);
     expect(csvTextExport).toContain('A銀行');
   });

@@ -81,7 +81,17 @@ export function App() {
   }, [formModal, loadLatest]);
 
   useEffect(() => {
-    void loadLatest();
+    let cancelled = false;
+    fetchStore()
+      .then((loaded) => {
+        if (cancelled) return;
+        setStore(loaded);
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'データの読み込みに失敗しました。');
+      });
     const handleSyncSignal = () => {
       if (isFormOpenRef.current) {
         deferredSyncRef.current = true;
@@ -89,7 +99,11 @@ export function App() {
       }
       void loadLatest();
     };
-    return subscribeStoreEvents(handleSyncSignal, handleSyncSignal);
+    const unsubscribe = subscribeStoreEvents(handleSyncSignal, handleSyncSignal);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [loadLatest]);
 
   const applyMutation = useCallback(
