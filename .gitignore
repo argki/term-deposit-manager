@@ -1,0 +1,15 @@
+# Dependencies & build
+node_modules/
+.pnpm-store/
+dist/
+
+# Local persisted user data (keep .gitkeep only)
+data/*
+!data/.gitkeep
+
+# Logs & OS files
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*

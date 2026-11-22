@@ -1,0 +1,18 @@
+{
+  "name": "定期預金マネージャー",
+  "short_name": "定期預金管理",
+  "description": "複数銀行の定期預金の満期管理・積替トレース・低金利預金の見直しを行うローカルWebアプリ",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/assets/icon.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="icon" type="image/x-icon" href="./assets/icon.ico" />
+    <link rel="icon" type="image/png" sizes="256x256" href="./assets/icon.png" />
+    <title>起動中... - 定期預金マネージャー</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --primary: #0f766e;
+        --primary-hover: #0d9488;
+        --primary-soft: #f0fdfa;
+        --update: #0284c7;
+        --update-soft: #e0f2fe;
+        --warn-bg: #fffbeb;
+        --warn-text: #b45309;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Meiryo',
+          sans-serif;
+      }
+      .card {
+        width: 100%;
+        max-width: 500px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 32px 24px;
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+        text-align: center;
+      }
+      .spinner-wrap {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 16px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #ccfbf1;
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      body.mode-update .spinner {
+        border-color: #bae6fd;
+        border-top-color: var(--update);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .badge.update {
+        background: var(--update-soft);
+        color: var(--update);
+      }
+      .badge.warn {
+        background: var(--warn-bg);
+        color: var(--warn-text);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 20px;
+        line-height: 1.4;
+      }
+      p {
+        margin: 0 0 18px;
+        font-size: 14px;
+        line-height: 1.65;
+        color: var(--text-muted);
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+      }
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        background: var(--primary);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--primary-hover);
+      }
+      .status {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .timeout-note {
+        display: none;
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: var(--warn-bg);
+        color: var(--warn-text);
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: left;
+      }
+      .timeout-note.visible {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="spinner-wrap" aria-hidden="true">
+        <div class="spinner"></div>
+      </div>
+      <div id="status-badge" class="badge">起動中</div>
+      <h1 id="page-heading">定期預金マネージャーを起動しています…</h1>
+      <p id="page-description">
+        アプリ起動中です。<br />
+        しばらくすると自動的に画面が切り替わりますので、このままお待ちください。
+      </p>
+      <div class="actions">
+        <button id="retry-btn" type="button">再確認する</button>
+        <div id="status-text" class="status">準備しています…（0秒経過）</div>
+      </div>
+      <div id="timeout-note" class="timeout-note" role="status">
+        起動に時間がかかっています。しばらく経っても切り替わらない場合は、一度画面を閉じてアプリをもう一度起動し直してみてください。
+      </div>
+    </main>
+    <script>
+      const APP_URL = 'http://127.0.0.1:3457/';
+      const HEALTH_URL = 'http://127.0.0.1:3457/api/health';
+      const POLL_INTERVAL_MS = 800;
+
+      const params = new URLSearchParams(window.location.search);
+      const isUpdateMode = params.get('mode') === 'update';
+      const TIMEOUT_NOTICE_MS = isUpdateMode ? 180000 : 35000;
+
+      const statusBadge = document.getElementById('status-badge');
+      const pageHeading = document.getElementById('page-heading');
+      const pageDescription = document.getElementById('page-description');
+      const statusText = document.getElementById('status-text');
+      const retryBtn = document.getElementById('retry-btn');
+      const timeoutNote = document.getElementById('timeout-note');
+
+      if (isUpdateMode) {
+        document.body.classList.add('mode-update');
+        document.title = 'アップデート中... - 定期預金マネージャー';
+        if (statusBadge) {
+          statusBadge.textContent = 'アップデート中';
+          statusBadge.classList.add('update');
+        }
+        if (pageHeading) {
+          pageHeading.textContent = 'アプリを最新バージョンに更新しています…';
+        }
+        if (pageDescription) {
+          pageDescription.innerHTML =
+            '最新の状態へアップデートしています。<br />通常より少し時間がかかる場合がありますが、完了すると自動的にアプリが開きますのでこのままお待ちください。';
+        }
+        if (timeoutNote) {
+          timeoutNote.textContent =
+            'アップデートに時間がかかっています。しばらく経っても切り替わらない場合は一度画面を閉じてアプリをもう一度起動し直してみてください。';
+        }
+      }
+
+      const startedAt = Date.now();
+      let checking = false;
+      let redirected = false;
+      let initialServerStartedAt = undefined;
+      let sawServerRestartOrStop = !isUpdateMode;
+
+      function updateElapsedText() {
+        if (redirected || !statusText) return;
+        const elapsedSec = Math.floor((Date.now() - startedAt) / 1000);
+        const prefix = isUpdateMode
+          ? '更新の完了を待っています…'
+          : '準備しています…';
+        statusText.textContent = `${prefix}（${elapsedSec}秒経過）`;
+
+        if (Date.now() - startedAt >= TIMEOUT_NOTICE_MS) {
+          if (statusBadge) {
+            statusBadge.textContent = isUpdateMode
+              ? '更新に時間がかかっています'
+              : '起動に時間がかかっています';
+            statusBadge.classList.remove('update');
+            statusBadge.classList.add('warn');
+          }
+          if (timeoutNote) {
+            timeoutNote.classList.add('visible');
+          }
+        }
+      }
+
+      async function checkHealth(manual) {
+        if (checking || redirected) return;
+        checking = true;
+        if (manual && statusText) {
+          statusText.textContent = '起動を確認しています…';
+        }
+        try {
+          const res = await fetch(HEALTH_URL, { cache: 'no-store' });
+          if (res.ok) {
+            let serverStartedAt = null;
+            try {
+              const data = await res.json();
+              serverStartedAt = typeof data?.startedAt === 'string' ? data.startedAt : null;
+            } catch {
+              serverStartedAt = null;
+            }
+
+            if (isUpdateMode && !sawServerRestartOrStop) {
+              if (initialServerStartedAt === undefined) {
+                initialServerStartedAt = serverStartedAt;
+              } else if (serverStartedAt && serverStartedAt !== initialServerStartedAt) {
+                sawServerRestartOrStop = true;
+              }
+            }
+
+            if (sawServerRestartOrStop) {
+              redirected = true;
+              if (statusText) {
+                statusText.textContent = isUpdateMode
+                  ? 'アップデートが完了しました。アプリを開きます…'
+                  : '準備ができました。アプリを開きます…';
+              }
+              window.location.replace(APP_URL);
+              return;
+            }
+          }
+        } catch {
+          if (isUpdateMode) {
+            sawServerRestartOrStop = true;
+          }
+        } finally {
+          checking = false;
+          if (!redirected && manual) {
+            updateElapsedText();
+          }
+        }
+      }
+
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+          void checkHealth(true);
+        });
+      }
+
+      void checkHealth(false);
+      setInterval(() => {
+        updateElapsedText();
+        void checkHealth(false);
+      }, POLL_INTERVAL_MS);
+    </script>
+  </body>
+</html>

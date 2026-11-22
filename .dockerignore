@@ -1,0 +1,8 @@
+node_modules
+.pnpm-store
+dist
+data/*.json
+data/*.sqlite*
+.git
+.env
+*.log
