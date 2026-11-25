@@ -27,6 +27,7 @@ description: >-
 2. **パッケージマネージャ**: `pnpm` を使用し、ロックファイル（`pnpm-lock.yaml`）でバージョンを厳密に管理する。
 3. **自動アップデート設定**:
    - `.github/dependabot.yml` により npm 依存関係・Docker ベースイメージ・GitHub Actions の定期アップデート PR が自動生成されるようにする。
+   - `.github/workflows/dependabot-auto-merge.yml`（`dependabot/fetch-metadata@v3` 使用）と GitHub Rulesets（`.github/rulesets/main-branch-protection.json`）を組み合わせ、CI（`verify` ジョブ）通過後にパッチ・マイナー更新の Dependabot PR が自動マージされるようにする。
 4. **CI 検証（GitHub Actions）**:
    - `.github/workflows/ci.yml` により PR / push 時に「型チェック → Lint → 単体テスト → ビルド」を自動実行し、破壊的変更を即検知できるようにする。
 
